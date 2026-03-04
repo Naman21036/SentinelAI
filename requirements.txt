@@ -17,4 +17,7 @@ regex
 from_root
 google-cloud-storage
 Jinja2
+transformers
+torch
+datasets
 -e .
