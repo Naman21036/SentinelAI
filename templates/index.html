@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="min-h-screen flex items-center justify-center px-6">
+
+<div class="w-full max-w-3xl">
+
+<h1 class="text-4xl font-bold text-center mb-2">
+SentinelAI
+</h1>
+
+<p class="text-center text-slate-400 mb-8">
+AI powered hate speech detection
+</p>
+
+<form action="/predict" method="post" class="space-y-4">
+
+<textarea
+name="text"
+rows="4"
+placeholder="Type text to analyze..."
+class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+>{{ text if text else "" }}</textarea>
+
+<button
+class="w-full bg-indigo-600 hover:bg-indigo-700 transition rounded-xl py-3 font-semibold"
+>
+Analyze Text
+</button>
+
+</form>
+
+{% if prediction %}
+
+<div class="mt-8 bg-slate-800 rounded-xl p-6 shadow-lg">
+
+<h2 class="text-xl font-semibold mb-3">
+Content Safety Assessment
+</h2>
+
+{% if prediction == "Hate / Abusive" %}
+
+<div class="text-red-400 font-bold text-lg">
+⚠ Content Flagged for Policy Review
+</div>
+
+{% else %}
+
+<div class="text-green-400 font-bold text-lg">
+✓ No Policy Violations Detected
+</div>
+
+{% endif %}
+
+<div class="mt-4">
+
+<div class="text-sm text-slate-400 mb-1">
+Model Confidence Score
+</div>
+
+<div class="w-full bg-slate-700 rounded-full h-3">
+
+<div
+class="bg-indigo-500 h-3 rounded-full"
+style="width: {{ confidence * 100 }}%"
+></div>
+
+</div>
+
+<p class="text-sm mt-2 text-slate-300">
+{{ confidence }}
+</p>
+
+</div>
+
+</div>
+
+{% endif %}
+
+</div>
+
+</div>
+
+{% endblock %}
