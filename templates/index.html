@@ -2,75 +2,80 @@
 
 {% block content %}
 
-<div class="min-h-screen flex items-center justify-center px-6">
+<div class="flex flex-col items-center justify-center min-h-screen px-6">
 
-<div class="w-full max-w-3xl">
+<!-- HERO -->
 
-<h1 class="text-4xl font-bold text-center mb-2">
+<div class="text-center mb-12">
+
+<h1 class="hero-title">
 SentinelAI
 </h1>
 
-<p class="text-center text-slate-400 mb-8">
+<p class="hero-subtitle">
 AI powered hate speech detection
 </p>
 
-<form action="/predict" method="post" class="space-y-4">
+</div>
+
+
+<!-- MAIN CARD -->
+
+<div class="ai-card">
+
+<form action="/predict" method="post" class="space-y-6">
 
 <textarea
 name="text"
 rows="4"
 placeholder="Type text to analyze..."
-class="w-full p-4 rounded-xl bg-slate-800 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+class="ai-input"
 >{{ text if text else "" }}</textarea>
 
-<button
-class="w-full bg-indigo-600 hover:bg-indigo-700 transition rounded-xl py-3 font-semibold"
->
+<button class="analyze-button">
 Analyze Text
 </button>
 
 </form>
 
+
 {% if prediction %}
 
-<div class="mt-8 bg-slate-800 rounded-xl p-6 shadow-lg">
+<div class="result-container">
 
-<h2 class="text-xl font-semibold mb-3">
-Content Safety Assessment
+<h2 class="result-title">
+Prediction Result
 </h2>
 
 {% if prediction == "Hate / Abusive" %}
 
-<div class="text-red-400 font-bold text-lg">
-⚠ Content Flagged for Policy Review
+<div class="prediction-badge danger">
+⚠ Hate / Abusive Language Detected
 </div>
 
 {% else %}
 
-<div class="text-green-400 font-bold text-lg">
-✓ No Policy Violations Detected
+<div class="prediction-badge safe">
+✓ No Hate Detected
 </div>
 
 {% endif %}
 
-<div class="mt-4">
+<div class="confidence-section">
 
-<div class="text-sm text-slate-400 mb-1">
-Model Confidence Score
+<div class="confidence-header">
+<span>Confidence</span>
+<span>{{ (confidence * 100)|round(1) }}%</span>
 </div>
 
-<div class="w-full bg-slate-700 rounded-full h-3">
+<div class="confidence-bar-bg">
 
 <div
-class="bg-indigo-500 h-3 rounded-full"
-style="width: {{ confidence * 100 }}%"
+class="confidence-bar"
+style="width: {{ (confidence * 100)|int }}%"
 ></div>
 
 </div>
-
-<p class="text-sm mt-2 text-slate-300">
-{{ confidence }}
-</p>
 
 </div>
 
