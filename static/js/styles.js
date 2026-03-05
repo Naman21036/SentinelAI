@@ -1,13 +1,31 @@
-console.log("SentinelAI UI Loaded")
+const text = "AI powered hate speech detection system"
 
-document.addEventListener("DOMContentLoaded", () => {
+let index = 0
 
-const btn = document.querySelector(".analyze-button")
+function typeEffect(){
 
-btn.addEventListener("click", () => {
+if(index < text.length){
 
-btn.innerHTML = "Analyzing..."
+document.getElementById("ai-typing").innerHTML += text.charAt(index)
+
+index++
+
+setTimeout(typeEffect,35)
+
+}
+
+}
+
+typeEffect()
+
+const btn = document.getElementById("analyzeBtn")
+
+if(btn){
+
+btn.addEventListener("click",()=>{
+
+document.getElementById("spinner").classList.remove("hidden")
 
 })
 
-})
+}

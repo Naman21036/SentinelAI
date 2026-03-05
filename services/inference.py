@@ -37,7 +37,7 @@ def predict_text(text):
     prediction = torch.argmax(probs).item()
     confidence = probs[0][prediction].item()
 
-    if confidence>0.5:
+    if confidence>0.5 or prediction == 1:
         result = "Hate / Abusive"
     else:
         result = "No Hate"
