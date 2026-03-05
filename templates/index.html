@@ -2,142 +2,90 @@
 
 {% block content %}
 
-<div class="page">
-
-<!-- HERO -->
-
-<div class="hero">
-
-<h1 class="title">
-SentinelAI
-</h1>
-
-<p class="subtitle" id="ai-typing"></p>
-
-</div>
-
-<!-- INPUT CARD -->
-
 <div class="card">
 
-<form action="/predict" method="post">
+<form method="POST" action="/predict">
 
 <textarea
 name="text"
-rows="4"
-placeholder="Type text to analyze..."
-class="input-box"
->{{ text if text else "" }}</textarea>
+placeholder="Enter text to analyze..."
+required>{{ text if text else "" }}</textarea>
 
-<button id="analyzeBtn" class="analyze-btn">
-Analyze Text
-</button>
+<button type="submit">Analyze Text</button>
 
 </form>
 
-<div id="spinner" class="spinner hidden"></div>
-
 {% if prediction %}
-
-<!-- RESULT -->
 
 <div class="result">
 
-<div class="result-main">
-
 {% if prediction == "Hate / Abusive" %}
 
-<div class="icon danger">⚠</div>
-
-<div>
-<div class="result-title danger">
-Hate / Abusive Language
-</div>
-
-<div class="result-sub">
-Toxic content detected
-</div>
+<div class="result-toxic">
+⚠ Toxic Content Detected
 </div>
 
 {% else %}
 
-<div class="icon safe">✓</div>
-
-<div>
-<div class="result-title safe">
-No Hate Detected
-</div>
-
-<div class="result-sub">
-Text appears safe
-</div>
+<div class="result-safe">
+✓ No Hate Detected
 </div>
 
 {% endif %}
 
-</div>
+<div class="metric">
 
-
-<!-- CONFIDENCE -->
-
-<div class="confidence">
-
-<div class="confidence-header">
 <span>Confidence</span>
-<span>{{ (confidence * 100)|round(1) }}%</span>
-</div>
 
-<div class="confidence-bg">
-
-<div
-class="confidence-bar"
-style="width: {{ (confidence * 100)|int }}%"
-></div>
+<span>{{ (confidence*100)|round(1) }}%</span>
 
 </div>
 
+<div class="bar">
+
+<div class="bar-fill"
+style="width: {{ confidence*100 }}%">
 </div>
 
-<!-- CHART -->
+</div>
 
-<canvas id="toxicityChart" height="180"></canvas>
+
+<div class="metric">
+
+<span>Safe Probability</span>
+
+<span>{{ (safe_probability*100)|round(1) }}%</span>
 
 </div>
 
-<script>
+<div class="bar">
 
-const confidence = {{ confidence }}
+<div class="bar-fill safe"
+style="width: {{ safe_probability*100 }}%">
+</div>
 
-const ctx = document.getElementById("toxicityChart")
+</div>
 
-new Chart(ctx, {
-type:"doughnut",
-data:{
-labels:["Safe","Toxic"],
-datasets:[{
-data:[1-confidence, confidence],
-backgroundColor:["#22c55e","#ef4444"]
-}]
-},
-options:{
-plugins:{legend:{display:false}}
-}
-})
 
-</script>
+<div class="metric">
+
+<span>Toxic Probability</span>
+
+<span>{{ (toxic_probability*100)|round(1) }}%</span>
+
+</div>
+
+<div class="bar">
+
+<div class="bar-fill toxic"
+style="width: {{ toxic_probability*100 }}%">
+</div>
+
+</div>
+
+</div>
 
 {% endif %}
-
-</div>
-
-<!-- FOOTER -->
-
-<div class="footer">
-
-SentinelAI — Developed by <span>Naman Gupta</span><br>
-AI Systems • Natural Language Processing • BIT Mesra
-
-</div>
 
 </div>
 

@@ -17,7 +17,7 @@ model.to(device)
 model.eval()
 
 
-def predict_text(text):
+def predict_text(text: str):
 
     inputs = tokenizer(
         text,
@@ -32,14 +32,26 @@ def predict_text(text):
     with torch.no_grad():
         outputs = model(**inputs)
 
-    probs = torch.softmax(outputs.logits, dim=1)
+    probs = torch.softmax(outputs.logits, dim=1)[0]
 
-    prediction = torch.argmax(probs).item()
-    confidence = probs[0][prediction].item()
+    p0 = probs[0].item()
+    p1 = probs[1].item()
 
-    if confidence>0.5 or prediction == 1:
-        result = "Hate / Abusive"
+    # Determine which is larger
+    if p0 > p1:
+        prediction = "No Hate"
+        safe_probability = p0
+        toxic_probability = p1
+        confidence = p0
     else:
-        result = "No Hate"
+        prediction = "Hate / Abusive"
+        safe_probability = p0
+        toxic_probability = p1
+        confidence = p1
 
-    return result, round(confidence, 3)
+    return {
+        "prediction": prediction,
+        "confidence": confidence,
+        "safe_probability": safe_probability,
+        "toxic_probability": toxic_probability
+    }

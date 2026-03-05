@@ -13,21 +13,26 @@ async def home(request: Request):
 
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "prediction": None}
+        {
+            "request": request,
+            "prediction": None
+        }
     )
 
 
 @router.post("/predict", response_class=HTMLResponse)
 async def predict(request: Request, text: str = Form(...)):
 
-    prediction, confidence = predict_text(text)
+    result = predict_text(text)
 
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
-            "prediction": prediction,
-            "confidence": confidence,
+            "prediction": result["prediction"],
+            "confidence": result["confidence"],
+            "safe_probability": result["safe_probability"],
+            "toxic_probability": result["toxic_probability"],
             "text": text
         }
     )
