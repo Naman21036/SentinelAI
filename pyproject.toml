@@ -11,7 +11,7 @@ dependencies = [
     "torch",
     "transformers",
     "datasets",
-    "fastapi",
+    "fastapi[standard]",
     "uvicorn[standard]",
     "gunicorn",
     "jinja2",
