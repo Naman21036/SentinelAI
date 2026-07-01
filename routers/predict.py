@@ -12,13 +12,10 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-
     return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "prediction": None
-        }
+        request=request,
+        name="index.html",
+        context={"prediction": None},
     )
 
 
@@ -27,9 +24,9 @@ async def predict(request: Request, text: str = Form(...)):
     try:
         result = predict_text(text)
         return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
+            request=request,
+            name="index.html",
+            context={
                 "prediction": result["prediction"],
                 "safe_probability": result["safe_probability"],
                 "toxic_probability": result["toxic_probability"],
@@ -39,9 +36,9 @@ async def predict(request: Request, text: str = Form(...)):
         )
     except FileNotFoundError:
         return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
+            request=request,
+            name="index.html",
+            context={
                 "text": text,
                 "error": "Model not trained yet. Run: python -m training.train_model",
             },
