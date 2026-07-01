@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Request, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -22,17 +24,25 @@ async def home(request: Request):
 
 @router.post("/predict", response_class=HTMLResponse)
 async def predict(request: Request, text: str = Form(...)):
-
-    result = predict_text(text)
-
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "prediction": result["prediction"],
-            "confidence": result["confidence"],
-            "safe_probability": result["safe_probability"],
-            "toxic_probability": result["toxic_probability"],
-            "text": text
-        }
-    )
+    try:
+        result = predict_text(text)
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "prediction": result["prediction"],
+                "safe_probability": result["safe_probability"],
+                "toxic_probability": result["toxic_probability"],
+                "text": text,
+                "analyzed_at": datetime.now().strftime("%H:%M:%S"),
+            },
+        )
+    except FileNotFoundError:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "text": text,
+                "error": "Model not trained yet. Run: python -m training.train_model",
+            },
+        )

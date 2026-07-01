@@ -6,23 +6,12 @@ dependencies = [
     "numpy",
     "pandas",
     "scikit-learn",
-    "matplotlib",
-    "seaborn",
     "torch",
-    "transformers",
-    "datasets",
     "fastapi[standard]",
     "uvicorn[standard]",
     "gunicorn",
     "jinja2",
     "python-multipart",
-    "requests",
-    "beautifulsoup4",
-    "lxml",
-    "nltk",
-    "regex",
-    "google-cloud-storage",
-    "from_root",
 ]
 
 [project.optional-dependencies]

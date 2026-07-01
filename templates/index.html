@@ -2,91 +2,144 @@
 
 {% block content %}
 
-<div class="card">
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Input</span>
+    <span class="panel-hint">Plain text · Tweets · Comments · Posts</span>
+  </div>
+  <form method="POST" action="/predict" id="analyze-form">
+    <div class="input-wrap">
+      <textarea name="text" id="text-input" spellcheck="false"
+        placeholder="Paste or type any content to analyze for hate speech, toxicity, or offensive language...">{{ text if text else "" }}</textarea>
+      <div class="scan-beam" id="scan-beam"></div>
+    </div>
+    <button type="submit" id="analyze-btn">
+      <span id="btn-text">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Run Analysis
+      </span>
+      <span id="btn-loader" style="display:none;">
+        <span class="spinner"></span>Analyzing...
+      </span>
+    </button>
+  </form>
+</div>
 
-<form method="POST" action="/predict">
-
-<textarea
-name="text"
-placeholder="Enter text to analyze..."
-required>{{ text if text else "" }}</textarea>
-
-<button type="submit">Analyze Text</button>
-
-</form>
+{% if error %}
+<div class="alert-error">{{ error }}</div>
+{% endif %}
 
 {% if prediction %}
+{% set is_safe = prediction == "No Hate" %}
+{% set t = toxic_probability * 100 %}
+{% set severity = "CRITICAL" if t >= 90 else "HIGH" if t >= 75 else "MEDIUM" if t >= 60 else "LOW" if t >= 50 else "CLEAR" %}
 
-<div class="result">
+<div class="result-panel {{ 'result-safe' if is_safe else 'result-danger' }}">
 
-{% if prediction == "Hate / Abusive" %}
+  <div class="result-header">
+    <div class="verdict-row">
+      <span class="verdict-dot {{ 'dot-safe' if is_safe else 'dot-danger' }}"></span>
+      <span class="verdict-label {{ 'text-safe' if is_safe else 'text-danger' }}">
+        {{ "Content Safe" if is_safe else "Threat Detected" }}
+      </span>
+    </div>
+    <span class="chip chip-{{ severity | lower }}">{{ severity }}</span>
+  </div>
 
-<div class="result-toxic">
-⚠ Toxic Content Detected
+  <div class="result-body">
+
+    <div class="result-left">
+      <div class="score-number {{ 'text-safe' if is_safe else 'text-danger' }}" id="score-display">
+        0<span class="score-unit">%</span>
+      </div>
+      <div class="score-label">Toxicity Score</div>
+
+      <div class="spectrum-track">
+        <div class="spectrum-marker" id="spectrum-marker"></div>
+      </div>
+      <div class="spectrum-ends">
+        <span>Safe</span>
+        <span>Toxic</span>
+      </div>
+    </div>
+
+    <div class="result-right">
+      <div class="metrics-title">Breakdown</div>
+
+      <div class="metric">
+        <div class="metric-top">
+          <span class="metric-name">Safe probability</span>
+          <span class="metric-val">{{ (safe_probability*100)|round(1) }}%</span>
+        </div>
+        <div class="metric-track">
+          <div class="metric-fill fill-safe" data-w="{{ (safe_probability*100)|round(1) }}"></div>
+        </div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-top">
+          <span class="metric-name">Toxic probability</span>
+          <span class="metric-val">{{ (toxic_probability*100)|round(1) }}%</span>
+        </div>
+        <div class="metric-track">
+          <div class="metric-fill fill-danger" data-w="{{ (toxic_probability*100)|round(1) }}"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="result-footer">
+    <span>{{ analyzed_at }}</span>
+    <span>BiLSTM · Attention · v1.0</span>
+  </div>
+
 </div>
 
-{% else %}
+<script>
+(function () {
+  var toxicVal = {{ toxic_probability }};
 
-<div class="result-safe">
-✓ No Hate Detected
-</div>
+  var marker = document.getElementById('spectrum-marker');
+  if (marker) {
+    marker.style.left = '0%';
+    requestAnimationFrame(function () {
+      setTimeout(function () { marker.style.left = (toxicVal * 100) + '%'; }, 80);
+    });
+  }
+
+  var scoreEl = document.getElementById('score-display');
+  if (scoreEl) {
+    var target = Math.round(toxicVal * 1000) / 10;
+    var current = 0;
+    var steps = 45;
+    var stepVal = target / steps;
+    var scoreClass = scoreEl.className;
+    var timer = setInterval(function () {
+      current = Math.min(current + stepVal, target);
+      var whole = Math.floor(current);
+      var dec = Math.round((current - whole) * 10);
+      scoreEl.innerHTML = whole + '.' + dec + '<span class="score-unit">%</span>';
+      if (current >= target) clearInterval(timer);
+    }, 16);
+  }
+
+  document.querySelectorAll('.metric-fill').forEach(function (el) {
+    var w = el.dataset.w;
+    el.style.width = '0';
+    el.style.transition = 'none';
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        el.style.transition = 'width 0.85s cubic-bezier(0.4,0,0.2,1)';
+        el.style.width = w + '%';
+      });
+    });
+  });
+})();
+</script>
 
 {% endif %}
-
-<div class="metric">
-
-<span>Confidence</span>
-
-<span>{{ (confidence*100)|round(1) }}%</span>
-
-</div>
-
-<div class="bar">
-
-<div class="bar-fill"
-style="width: {{ confidence*100 }}%">
-</div>
-
-</div>
-
-
-<div class="metric">
-
-<span>Safe Probability</span>
-
-<span>{{ (safe_probability*100)|round(1) }}%</span>
-
-</div>
-
-<div class="bar">
-
-<div class="bar-fill safe"
-style="width: {{ safe_probability*100 }}%">
-</div>
-
-</div>
-
-
-<div class="metric">
-
-<span>Toxic Probability</span>
-
-<span>{{ (toxic_probability*100)|round(1) }}%</span>
-
-</div>
-
-<div class="bar">
-
-<div class="bar-fill toxic"
-style="width: {{ toxic_probability*100 }}%">
-</div>
-
-</div>
-
-</div>
-
-{% endif %}
-
-</div>
 
 {% endblock %}

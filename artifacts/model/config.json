@@ -1,0 +1,8 @@
+{
+  "vocab_size": 20000,
+  "embed_dim": 128,
+  "lstm_hidden": 128,
+  "attn_heads": 4,
+  "dropout": 0.3,
+  "max_length": 100
+}

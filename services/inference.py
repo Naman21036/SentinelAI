@@ -1,57 +1,70 @@
+import json
 import os
+
 import torch
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
-MODEL_PATH = os.path.join(
-    "artifacts",
-    "03_04_2026_09_49_32",
-    "ModelEvaluationArtifacts",
-    "best_Model"
-)
+from services.classifier import HateSpeechClassifier, WordTokenizer, clean_text
 
-tokenizer = DistilBertTokenizer.from_pretrained(MODEL_PATH)
-model = DistilBertForSequenceClassification.from_pretrained(MODEL_PATH)
+ARTIFACTS_DIR = os.path.join("artifacts", "model")
+MODEL_PATH = os.path.join(ARTIFACTS_DIR, "model.pt")
+VOCAB_PATH = os.path.join(ARTIFACTS_DIR, "vocab.json")
+CONFIG_PATH = os.path.join(ARTIFACTS_DIR, "config.json")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-model.eval()
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+_model: HateSpeechClassifier | None = None
+_tokenizer: WordTokenizer | None = None
+_max_length: int = 100
 
 
-def predict_text(text: str):
+def _load() -> None:
+    global _model, _tokenizer, _max_length
 
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        padding=True,
-        max_length=128
-    )
+    if _model is not None:
+        return
 
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(
+            f"Model not found at '{MODEL_PATH}'. "
+            "Run: python -m training.train_model"
+        )
+
+    with open(CONFIG_PATH) as f:
+        cfg = json.load(f)
+
+    _max_length = cfg["max_length"]
+    _tokenizer = WordTokenizer.load(VOCAB_PATH)
+
+    _model = HateSpeechClassifier(
+        vocab_size=cfg["vocab_size"],
+        embed_dim=cfg["embed_dim"],
+        lstm_hidden=cfg["lstm_hidden"],
+        attn_heads=cfg["attn_heads"],
+        dropout=0.0,
+    ).to(DEVICE)
+
+    state = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    _model.load_state_dict(state)
+    _model.eval()
+
+
+def predict_text(text: str) -> dict:
+    _load()
+
+    clean = clean_text(text)
+    ids = _tokenizer.encode(clean, _max_length)
+    tensor = torch.tensor([ids], dtype=torch.long).to(DEVICE)
 
     with torch.no_grad():
-        outputs = model(**inputs)
+        logit = _model(tensor).item()
 
-    probs = torch.softmax(outputs.logits, dim=1)[0]
-
-    p0 = probs[0].item()
-    p1 = probs[1].item()
-
-    # Determine which is larger
-    if p0 > p1:
-        prediction = "No Hate"
-        safe_probability = p0
-        toxic_probability = p1
-        confidence = p0
-    else:
-        prediction = "Hate / Abusive"
-        safe_probability = p0
-        toxic_probability = p1
-        confidence = p1
+    prob = float(torch.sigmoid(torch.tensor(logit)))
+    toxic_probability = prob
+    safe_probability = 1.0 - prob
+    is_hate = prob > 0.5
 
     return {
-        "prediction": prediction,
-        "confidence": confidence,
+        "prediction": "Hate / Abusive" if is_hate else "No Hate",
         "safe_probability": safe_probability,
-        "toxic_probability": toxic_probability
+        "toxic_probability": toxic_probability,
     }
