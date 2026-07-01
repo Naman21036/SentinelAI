@@ -1,156 +1,153 @@
 import os
+import json
 import sys
-import torch
+
 import pandas as pd
-import numpy as np
-
-from datasets import Dataset
-from transformers import (
-    DistilBertTokenizer,
-    DistilBertForSequenceClassification,
-    TrainingArguments,
-    Trainer
-)
-
+import torch
+import torch.nn as nn
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+from sklearn.metrics import f1_score, classification_report
+from torch.utils.data import Dataset, DataLoader
 
 from SentinelAI.logger import logging
 from SentinelAI.exception import CustomException
 from SentinelAI.entity.config_entity import ModelTrainerConfig
 from SentinelAI.entity.artifact_entity import (
     ModelTrainerArtifacts,
-    DataTransformationArtifacts
+    DataTransformationArtifacts,
 )
 from SentinelAI.constants import TWEET, LABEL
+from services.classifier import (
+    HateSpeechClassifier,
+    WordTokenizer,
+    clean_text,
+    VOCAB_SIZE, EMBED_DIM, LSTM_HIDDEN, ATTN_HEADS, DROPOUT, MAX_LENGTH,
+)
+
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BATCH_SIZE = 64
+EPOCHS = 15
+LR = 1e-3
+PATIENCE = 4
+
+
+class _TweetDataset(Dataset):
+    def __init__(self, texts, labels, tokenizer):
+        self.seqs = [torch.tensor(tokenizer.encode(t), dtype=torch.long) for t in texts]
+        self.labels = torch.tensor(labels, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return self.seqs[idx], self.labels[idx]
 
 
 class ModelTrainer:
 
-    def __init__(self,
-                 data_transformation_artifacts: DataTransformationArtifacts,
-                 model_trainer_config: ModelTrainerConfig):
-
+    def __init__(
+        self,
+        data_transformation_artifacts: DataTransformationArtifacts,
+        model_trainer_config: ModelTrainerConfig,
+    ):
         self.data_artifacts = data_transformation_artifacts
         self.config = model_trainer_config
 
-
-    def compute_metrics(self, pred):
-        logits, labels = pred
-        preds = np.argmax(logits, axis=1)
-
-        precision, recall, f1, _ = precision_recall_fscore_support(
-            labels, preds, average="binary"
-        )
-
-        acc = accuracy_score(labels, preds)
-
-        return {
-            "accuracy": acc,
-            "f1": f1,
-            "precision": precision,
-            "recall": recall
-        }
-
-
     def initiate_model_trainer(self) -> ModelTrainerArtifacts:
-
         try:
             logging.info("Reading transformed dataset")
-
             df = pd.read_csv(self.data_artifacts.transformed_data_path)
-
             df = df.dropna(subset=[TWEET])
             df[TWEET] = df[TWEET].astype(str)
-            print(df[LABEL].unique())
-            print(df[LABEL].min(), df[LABEL].max())
 
-            train_df, val_df = train_test_split(
-                df,
-                test_size=0.2,
-                random_state=42
+            X = df[TWEET].to_numpy()
+            y = df[LABEL].to_numpy().astype(int)
+
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42, stratify=y
             )
 
-            train_dataset = Dataset.from_pandas(
-                train_df[[TWEET, LABEL]].rename(columns={TWEET: "text"})
+            logging.info("Building vocabulary")
+            tokenizer = WordTokenizer(VOCAB_SIZE)
+            tokenizer.fit(X_train)
+
+            train_loader = DataLoader(
+                _TweetDataset(X_train, y_train, tokenizer), batch_size=BATCH_SIZE, shuffle=True
+            )
+            test_loader = DataLoader(
+                _TweetDataset(X_test, y_test, tokenizer), batch_size=BATCH_SIZE
             )
 
-            val_dataset = Dataset.from_pandas(
-                val_df[[TWEET, LABEL]].rename(columns={TWEET: "text"})
+            logging.info("Building BiLSTM + Attention model")
+            model = HateSpeechClassifier(
+                vocab_size=VOCAB_SIZE, embed_dim=EMBED_DIM,
+                lstm_hidden=LSTM_HIDDEN, attn_heads=ATTN_HEADS, dropout=DROPOUT,
+            ).to(DEVICE)
+
+            pos_weight = torch.tensor(
+                [(y_train == 0).sum() / max((y_train == 1).sum(), 1)], dtype=torch.float32
+            ).to(DEVICE)
+            criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+            optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode="max", patience=2, factor=0.5,
             )
 
-            logging.info("Loading tokenizer")
+            best_f1, best_state, no_improve = 0.0, {}, 0
 
-            tokenizer = DistilBertTokenizer.from_pretrained(
-                self.config.HF_MODEL_NAME
-            )
+            for epoch in range(1, EPOCHS + 1):
+                model.train()
+                for seqs, labels in train_loader:
+                    seqs, labels = seqs.to(DEVICE), labels.to(DEVICE)
+                    optimizer.zero_grad()
+                    criterion(model(seqs), labels).backward()
+                    nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    optimizer.step()
 
-            def tokenize(batch):
-                return tokenizer(
-                    batch["text"],
-                    padding="max_length",
-                    truncation=True,
-                    max_length=self.config.MAX_LENGTH
-                )
+                model.eval()
+                preds, trues = [], []
+                with torch.no_grad():
+                    for seqs, labels in test_loader:
+                        probs = torch.sigmoid(model(seqs.to(DEVICE))).cpu().numpy()
+                        preds.extend((probs > 0.5).astype(int))
+                        trues.extend(labels.numpy().astype(int))
 
-            train_dataset = train_dataset.map(tokenize, batched=True)
-            val_dataset = val_dataset.map(tokenize, batched=True)
+                f1 = f1_score(trues, preds)
+                scheduler.step(f1)
+                logging.info(f"Epoch {epoch}/{EPOCHS}  f1={f1:.4f}")
 
-            train_dataset.set_format(
-                "torch",
-                columns=["input_ids", "attention_mask", "label"]
-            )
-
-            val_dataset.set_format(
-                "torch",
-                columns=["input_ids", "attention_mask", "label"]
-            )
-
-            logging.info("Loading transformer model")
-
-            model = DistilBertForSequenceClassification.from_pretrained(
-                self.config.HF_MODEL_NAME,
-                num_labels=self.config.NUM_LABELS
-            )
-
-            training_args = TrainingArguments(
-                output_dir=self.config.OUTPUT_DIR,
-                eval_strategy="epoch",
-                save_strategy="epoch",
-                learning_rate=self.config.LEARNING_RATE,
-                per_device_train_batch_size=self.config.TRAIN_BATCH_SIZE,
-                per_device_eval_batch_size=self.config.EVAL_BATCH_SIZE,
-                num_train_epochs=self.config.NUM_EPOCHS,
-                weight_decay=self.config.WEIGHT_DECAY,
-                load_best_model_at_end=True,
-                metric_for_best_model="f1",
-                greater_is_better=True,
-                fp16=True
-            )
-
-            trainer = Trainer(
-                model=model,
-                args=training_args,
-                train_dataset=train_dataset,
-                eval_dataset=val_dataset,
-                compute_metrics=self.compute_metrics
-            )
-
-            logging.info("Starting training")
-
-            trainer.train()
+                if f1 > best_f1:
+                    best_f1 = f1
+                    best_state = {k: v.clone() for k, v in model.state_dict().items()}
+                    no_improve = 0
+                else:
+                    no_improve += 1
+                    if no_improve >= PATIENCE:
+                        logging.info(f"Early stopping at epoch {epoch}")
+                        break
 
             os.makedirs(self.config.MODEL_DIR, exist_ok=True)
-            os.makedirs(self.config.TOKENIZER_DIR, exist_ok=True)
+            model.load_state_dict(best_state)
 
-            model.save_pretrained(self.config.MODEL_DIR)
-            tokenizer.save_pretrained(self.config.TOKENIZER_DIR)
+            model_path = os.path.join(self.config.MODEL_DIR, "model.pt")
+            vocab_path = os.path.join(self.config.MODEL_DIR, "vocab.json")
+            config_path = os.path.join(self.config.MODEL_DIR, "config.json")
 
-            logging.info("Model training complete")
+            torch.save(model.state_dict(), model_path)
+            tokenizer.save(vocab_path)
 
-            return ModelTrainerArtifacts(
-                trained_model_path=self.config.MODEL_DIR,
-            )
+            with open(config_path, "w") as f:
+                json.dump({
+                    "vocab_size": VOCAB_SIZE, "embed_dim": EMBED_DIM,
+                    "lstm_hidden": LSTM_HIDDEN, "attn_heads": ATTN_HEADS,
+                    "dropout": DROPOUT, "max_length": MAX_LENGTH,
+                }, f, indent=2)
+
+            logging.info(f"Model training complete. Best F1: {best_f1:.4f}")
+            logging.info(classification_report(trues, preds, target_names=["Safe", "Hate/Toxic"]))
+
+            return ModelTrainerArtifacts(trained_model_path=self.config.MODEL_DIR)
 
         except Exception as e:
             raise CustomException(e, sys) from e

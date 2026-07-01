@@ -43,15 +43,11 @@ class DataTransformation:
             inplace = self.data_transformation_config.INPLACE)
 
             raw_data[raw_data[self.data_transformation_config.CLASS]==0][self.data_transformation_config.CLASS]=1
-            
-            # replace the value of 0 to 1
             raw_data[self.data_transformation_config.CLASS] = raw_data[self.data_transformation_config.CLASS
             ].apply(lambda x: 1 if x in [0, 1] else 0)
 
-            # Let's replace the value of 2 to 0.
             raw_data[self.data_transformation_config.CLASS].replace({2:0}, inplace = True)
 
-            # Let's change the name of the 'class' to label
             raw_data.rename(columns={self.data_transformation_config.CLASS:self.data_transformation_config.LABEL},inplace =True)
             logging.info(f"Exited the raw_data_cleaning function and returned the raw_data {raw_data}")
             return raw_data
@@ -65,7 +61,6 @@ class DataTransformation:
 
         try:
             logging.info("Entered into the concat_dataframe function")
-            # Let's concatinate both the data into a single data frame.
             frame = [self.raw_data_cleaning(), self.imbalance_data_cleaning()]
             df = pd.concat(frame)
             print(df.head())

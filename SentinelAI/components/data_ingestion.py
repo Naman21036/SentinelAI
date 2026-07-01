@@ -18,10 +18,8 @@ class DataIngestion:
         logging.info("Entered unzip_data method")
 
         try:
-            # Create artifacts directory
             os.makedirs(self.config.DATA_INGESTION_ARTIFACTS_DIR, exist_ok=True)
 
-            # Extract zip from local path
             with ZipFile(self.config.ZIP_FILE_PATH, 'r') as zip_ref:
                 zip_ref.extractall(self.config.DATA_INGESTION_ARTIFACTS_DIR)
 
@@ -36,7 +34,6 @@ class DataIngestion:
             raise CustomException(e, sys) from e
     def data_validation(self):
         logging.info("Entered data_validation method")
-        # Implement any data validation logic here if needed
         try:
             imb_df= pd.read_csv(self.config.IMBALANCED_DATA_PATH)
             logging.info(f'The columns in the dataset are: {imb_df.columns} and the shape of the dataset is: {imb_df.shape}')
