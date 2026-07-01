@@ -1,9 +1,8 @@
 # SentinelAI
 
-**AI Powered Hate Speech Detection using DistilBERT**
+**AI Powered Hate Speech Detection using BiLSTM + Attention**
 
-SentinelAI is a transformer based Natural Language Processing system that detects hate speech and abusive language in real time.
-The project uses a fine tuned **DistilBERT model** integrated with a **FastAPI web application** to deliver fast and reliable predictions through a modern web interface.
+SentinelAI is a deep learning system that detects hate speech and toxic content in real time. The project uses a custom **Bidirectional LSTM with Multi-Head Self-Attention** model — trained from scratch on 56,000+ samples — integrated with a **FastAPI web application** and a modern dark-theme interface.
 
 ---
 
@@ -13,128 +12,131 @@ Online platforms generate massive amounts of user generated content every day. D
 
 SentinelAI provides an AI powered system that:
 
-• Detects toxic or abusive text
-• Uses transformer based deep learning
-• Provides real time predictions via web interface
-• Can be integrated into moderation pipelines
+- Detects hate speech, toxicity, and offensive language
+- Uses a custom BiLSTM + Attention deep learning model (no pretrained weights, no API calls)
+- Provides real time predictions with a toxicity score and severity classification
+- Delivers results through a professional dark-theme web interface with animated visualizations
+- Can be deployed on any container platform (Docker ready)
+
+---
+
+## Model
+
+The project uses a **custom BiLSTM + Multi-Head Self-Attention** model trained from scratch — no HuggingFace, no pretrained weights, no external API.
+
+| Property | Value |
+|---|---|
+| Architecture | Embedding → BiLSTM → Multi-Head Attention → LayerNorm → FC |
+| Parameters | ~3.1M |
+| Vocabulary | 20,000 words (custom WordTokenizer, serialized to JSON) |
+| Training data | 56,701 samples (raw_data.csv + imbalanced_data.csv) |
+| Loss | BCEWithLogitsLoss with pos_weight (handles class imbalance) |
+| Optimizer | AdamW + ReduceLROnPlateau scheduler |
+| Accuracy | 95% |
+| F1 Score | 0.93 |
+| Classes | 0 → No Hate, 1 → Hate / Abusive |
+
+Model artifacts (`model.pt`, `vocab.json`, `config.json`) are committed to the repository — zero downloads at runtime.
 
 ---
 
 ## Features
 
-Real time hate speech detection
-Transformer based NLP model (DistilBERT)
-FastAPI backend for high performance inference
-Interactive web interface
-Confidence score visualization
-Modular ML pipeline architecture
+- Real time hate speech and toxicity detection
+- Custom BiLSTM + Multi-Head Self-Attention (trained from scratch)
+- Toxicity score with animated count-up display
+- Green → Yellow → Red spectrum bar with position marker
+- Severity classification: CLEAR / LOW / MEDIUM / HIGH / CRITICAL
+- Animated neural network canvas background
+- Gradient shield logo and SVG favicon
+- Two-column result layout (score + breakdown)
+- Lazy model loading on first request
+- Docker ready, deployed on Render
 
 ---
 
 ## Tech Stack
 
 ### Machine Learning
-
-Python
-PyTorch
-Transformers (HuggingFace)
-DistilBERT
+- Python 3.11
+- PyTorch (CPU)
+- Custom WordTokenizer (word-level, JSON serialized)
+- Scikit-learn (train/test split, metrics)
+- Pandas / NumPy
 
 ### Backend
-
-FastAPI
-Uvicorn
+- FastAPI
+- Uvicorn / Gunicorn
+- Jinja2 (server-side rendering)
 
 ### Frontend
-
-HTML
-TailwindCSS
-JavaScript
-
-### Data Processing
-
-Pandas
-NLTK
-Scikit Learn
+- HTML / CSS / JavaScript
+- Inter + JetBrains Mono (Google Fonts)
+- Canvas-based animated neural network background
+- No CSS framework (custom design system)
 
 ---
 
-## Project Architecture
+## Project Structure
 
 ```
-SentinelAI
+SentinelAI/
 │
-├── app.py
+├── app.py                        # FastAPI application entry point
 │
-├── routers
-│   └── predict.py
+├── routers/
+│   └── predict.py                # GET / and POST /predict routes
 │
-├── services
-│   └── inference.py
+├── services/
+│   ├── classifier.py             # BiLSTM model + WordTokenizer definitions
+│   └── inference.py              # Lazy model loading + predict_text()
 │
-├── templates
-│   ├── base.html
-│   └── index.html
+├── training/
+│   └── train_model.py            # Standalone training script
 │
-├── static
-│   ├── css
-│   └── js
+├── templates/
+│   ├── base.html                 # Layout: topbar, canvas, fonts
+│   └── index.html                # Input form + result card
 │
-├── artifacts
-│   └── trained models
+├── static/
+│   ├── css/styles.css
+│   ├── js/script.js
+│   └── favicon.svg
 │
-└── notebooks
+├── artifacts/
+│   └── model/
+│       ├── model.pt              # Trained model weights (12 MB)
+│       ├── vocab.json            # WordTokenizer vocabulary
+│       └── config.json           # Model hyperparameters
+│
+├── data/
+│   ├── raw_data.csv
+│   └── imbalanced_data.csv
+│
+├── Dockerfile
+├── render.yaml
+├── requirements.txt
+└── runtime.txt
 ```
-
----
-
-## Model
-
-The project uses a **DistilBERT transformer model** fine tuned for hate speech classification.
-
-Model characteristics:
-
-Architecture: DistilBERT
-Task: Text Classification
-Classes:
-
-0 → Non Hate
-1 → Hate / Abusive
 
 ---
 
 ## Installation
 
-Clone the repository
-
-```
-git clone https://github.com/yourusername/SentinelAI.git
+```bash
+git clone https://github.com/Naman21036/SentinelAI.git
 cd SentinelAI
 ```
 
-Create virtual environment
-
-```
+```bash
 python -m venv venv
-```
-
-Activate environment
-
-Windows
-
-```
+# Windows
 venv\Scripts\activate
-```
-
-Linux / Mac
-
-```
+# Linux / Mac
 source venv/bin/activate
 ```
 
-Install dependencies
-
-```
+```bash
 pip install -r requirements.txt
 ```
 
@@ -142,54 +144,62 @@ pip install -r requirements.txt
 
 ## Running the Application
 
-Start the FastAPI server
-
-```
-uvicorn app:app --reload
+```bash
+python -m uvicorn app:app --reload --port 8000
 ```
 
-Open in browser
+Open in browser: `http://127.0.0.1:8000`
 
+---
+
+## Training the Model
+
+If you want to retrain from scratch:
+
+```bash
+python -m training.train_model
 ```
-http://127.0.0.1:8000
+
+This reads `data/raw_data.csv` and `data/imbalanced_data.csv`, trains the BiLSTM model, and saves artifacts to `artifacts/model/`.
+
+---
+
+## Deployment
+
+The app is Docker ready. It uses the CPU-only PyTorch wheel to keep the image size small.
+
+```bash
+docker build -t sentinelai .
+docker run -p 8000:8000 sentinelai
 ```
+
+**Render:** Connect the GitHub repo. Render uses `render.yaml` to detect Docker environment automatically. Set `PYTHON_VERSION=3.11.9` as an environment variable if using the native Python runtime.
 
 ---
 
 ## Example
 
 Input
-
 ```
 You are a useless idiot
 ```
 
 Output
-
 ```
-Prediction: Hate / Abusive
-Confidence: 0.93
+Threat Detected · HIGH
+Toxicity Score: 82.4%
+Safe: 17.6%  |  Toxic: 82.4%
 ```
 
 ---
 
 ## Use Cases
 
-Content moderation systems
-Social media platforms
-Online communities
-Gaming chat monitoring
-Comment filtering systems
-
----
-
-## Future Improvements
-
-Real time streaming inference
-Multilingual hate speech detection
-API integration for external applications
-Model explainability using SHAP
-Deployment with Docker and Kubernetes
+- Content moderation systems
+- Social media platforms
+- Online communities
+- Gaming chat monitoring
+- Comment filtering pipelines
 
 ---
 
@@ -211,7 +221,6 @@ This project is licensed under the MIT License.
 
 ## Author
 
-Naman Gupta
-BIT Mesra
-
+**Naman Gupta**  
+BIT Mesra  
 AI and Quantitative Finance Enthusiast
