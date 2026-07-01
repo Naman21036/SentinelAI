@@ -225,4 +225,4 @@ This project is licensed under the MIT License.
 
 **Naman Gupta**  
 BIT Mesra  
-AI and Quantitative Finance Enthusiast
+AI Enginnering Enthusiast
