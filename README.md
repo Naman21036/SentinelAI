@@ -2,6 +2,8 @@
 
 **AI Powered Hate Speech Detection using BiLSTM + Attention**
 
+**Live Demo → [sentinelai-egh5.onrender.com](https://sentinelai-egh5.onrender.com)**
+
 SentinelAI is a deep learning system that detects hate speech and toxic content in real time. The project uses a custom **Bidirectional LSTM with Multi-Head Self-Attention** model — trained from scratch on 56,000+ samples — integrated with a **FastAPI web application** and a modern dark-theme interface.
 
 ---
